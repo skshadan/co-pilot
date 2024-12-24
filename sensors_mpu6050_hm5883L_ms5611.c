@@ -136,7 +136,6 @@
 #define PITCH_CALIB (CONFIG_PITCH_CALIB*1.0/100)
 #define ROLL_CALIB (CONFIG_ROLL_CALIB*1.0/100)
 
-
 // FOR BMI
 // Replace MPU6050 definitions with BMI270
 // #define SENSORS_BMI270_DLPF_256HZ
@@ -407,64 +406,89 @@ void processMagnetometerMeasurements(const uint8_t *buffer)
 }
 
 
-void processAccGyroMeasurements(void)
+// void processAccGyroMeasurements(void)
+// {
+//     Axis3f accScaled;
+//     struct bmi2_sens_data sensor_data;
+//     int8_t rslt = bmi2_get_sensor_data(&sensor_data, &bmi2_dev);
+    
+//     if (rslt == BMI2_OK) {
+//         // Convert BMI270 data to raw format for compatibility
+//         accelRaw.x = sensor_data.acc.x;
+//         accelRaw.y = sensor_data.acc.y;
+//         accelRaw.z = sensor_data.acc.z;
+        
+//         gyroRaw.x = sensor_data.gyr.x;
+//         gyroRaw.y = sensor_data.gyr.y;
+//         gyroRaw.z = sensor_data.gyr.z;
+
+//         // Process gyro bias
+//         #ifdef GYRO_BIAS_LIGHT_WEIGHT
+//             gyroBiasFound = processGyroBiasNoBuffer(gyroRaw.x, gyroRaw.y, gyroRaw.z, &gyroBias);
+//         #else
+//             gyroBiasFound = processGyroBias(gyroRaw.x, gyroRaw.y, gyroRaw.z, &gyroBias);
+//         #endif
+
+//         // Process accelerometer scale when gyro bias is found
+//         if (gyroBiasFound) {
+//             processAccScale(accelRaw.x, accelRaw.y, accelRaw.z);
+//         }
+
+//         // Convert gyro readings to degrees per second
+//         #ifdef CONFIG_TARGET_ESPLANE_V1
+//             sensorData.gyro.x = (gyroRaw.x - gyroBias.x) * SENSORS_DEG_PER_LSB_CFG;
+//         #else
+//             sensorData.gyro.x = -(gyroRaw.x - gyroBias.x) * SENSORS_DEG_PER_LSB_CFG;
+//         #endif
+        
+//         sensorData.gyro.y = (gyroRaw.y - gyroBias.y) * SENSORS_DEG_PER_LSB_CFG;
+//         sensorData.gyro.z = (gyroRaw.z - gyroBias.z) * SENSORS_DEG_PER_LSB_CFG;
+
+//         // Apply low-pass filter to gyro data
+//         applyAxis3fLpf((lpf2pData *)(&gyroLpf), &sensorData.gyro);
+
+//         // Convert accelerometer readings to G's
+//         #ifdef CONFIG_TARGET_ESPLANE_V1
+//             accScaled.x = (accelRaw.x) * SENSORS_G_PER_LSB_CFG / accScale;
+//         #else
+//             accScaled.x = -(accelRaw.x) * SENSORS_G_PER_LSB_CFG / accScale;
+//         #endif
+
+//         accScaled.y = (accelRaw.y) * SENSORS_G_PER_LSB_CFG / accScale;
+//         accScaled.z = (accelRaw.z) * SENSORS_G_PER_LSB_CFG / accScale;
+
+//         // Compensate for accelerometer alignment
+//         sensorsAccAlignToGravity(&accScaled, &sensorData.acc);
+//         applyAxis3fLpf((lpf2pData *)(&accLpf), &sensorData.acc);
+//     }
+// }
+
+
+
+
+static void processAccGyroMeasurements(void)
 {
-    Axis3f accScaled;
-    struct bmi2_sens_data sensor_data;
+    struct bmi2_sens_data sensor_data = { 0 };
     int8_t rslt = bmi2_get_sensor_data(&sensor_data, &bmi2_dev);
     
     if (rslt == BMI2_OK) {
-        // Convert BMI270 data to raw format for compatibility
-        accelRaw.x = sensor_data.acc.x;
-        accelRaw.y = sensor_data.acc.y;
-        accelRaw.z = sensor_data.acc.z;
-        
+        // Convert BMI270 data to your format
         gyroRaw.x = sensor_data.gyr.x;
         gyroRaw.y = sensor_data.gyr.y;
         gyroRaw.z = sensor_data.gyr.z;
 
-        // Process gyro bias
-        #ifdef GYRO_BIAS_LIGHT_WEIGHT
-            gyroBiasFound = processGyroBiasNoBuffer(gyroRaw.x, gyroRaw.y, gyroRaw.z, &gyroBias);
-        #else
-            gyroBiasFound = processGyroBias(gyroRaw.x, gyroRaw.y, gyroRaw.z, &gyroBias);
-        #endif
+        accelRaw.x = sensor_data.acc.x;
+        accelRaw.y = sensor_data.acc.y;
+        accelRaw.z = sensor_data.acc.z;
 
-        // Process accelerometer scale when gyro bias is found
-        if (gyroBiasFound) {
-            processAccScale(accelRaw.x, accelRaw.y, accelRaw.z);
-        }
+        DEBUG_PRINTI("Raw data - Gyro: %d,%d,%d Acc: %d,%d,%d", 
+            gyroRaw.x, gyroRaw.y, gyroRaw.z,
+            accelRaw.x, accelRaw.y, accelRaw.z);
 
-        // Convert gyro readings to degrees per second
-        #ifdef CONFIG_TARGET_ESPLANE_V1
-            sensorData.gyro.x = (gyroRaw.x - gyroBias.x) * SENSORS_DEG_PER_LSB_CFG;
-        #else
-            sensorData.gyro.x = -(gyroRaw.x - gyroBias.x) * SENSORS_DEG_PER_LSB_CFG;
-        #endif
+        gyroBiasFound = processGyroBias(gyroRaw.x, gyroRaw.y, gyroRaw.z, &gyroBias);
         
-        sensorData.gyro.y = (gyroRaw.y - gyroBias.y) * SENSORS_DEG_PER_LSB_CFG;
-        sensorData.gyro.z = (gyroRaw.z - gyroBias.z) * SENSORS_DEG_PER_LSB_CFG;
-
-        // Apply low-pass filter to gyro data
-        applyAxis3fLpf((lpf2pData *)(&gyroLpf), &sensorData.gyro);
-
-        // Convert accelerometer readings to G's
-        #ifdef CONFIG_TARGET_ESPLANE_V1
-            accScaled.x = (accelRaw.x) * SENSORS_G_PER_LSB_CFG / accScale;
-        #else
-            accScaled.x = -(accelRaw.x) * SENSORS_G_PER_LSB_CFG / accScale;
-        #endif
-
-        accScaled.y = (accelRaw.y) * SENSORS_G_PER_LSB_CFG / accScale;
-        accScaled.z = (accelRaw.z) * SENSORS_G_PER_LSB_CFG / accScale;
-
-        // Compensate for accelerometer alignment
-        sensorsAccAlignToGravity(&accScaled, &sensorData.acc);
-        applyAxis3fLpf((lpf2pData *)(&accLpf), &sensorData.acc);
+        // Rest of your processing code...
     }
-}
-
-
 
 //Modified data processing function
 
@@ -1005,19 +1029,20 @@ static bool processAccScale(int16_t ax, int16_t ay, int16_t az)
 // Lightweight implementation without buffer
 static bool processGyroBias(int16_t gx, int16_t gy, int16_t gz, Axis3f *gyroBiasOut)
 {
+    DEBUG_PRINTI("Raw gyro values: x=%d, y=%d, z=%d", gx, gy, gz);  // Add debug print
+
     sensorsAddBiasValue(&gyroBiasRunning, gx, gy, gz);
 
     if (!gyroBiasRunning.isBiasValueFound) {
         sensorsFindBiasValue(&gyroBiasRunning);
 
         if (gyroBiasRunning.isBiasValueFound) {
-            DEBUG_PRINTI("Gyro bias found: x=%f, y=%f, z=%f\n", 
+            DEBUG_PRINTI("Gyro bias found! x=%f, y=%f, z=%f", 
                 (double)gyroBiasRunning.bias.x,
                 (double)gyroBiasRunning.bias.y,
                 (double)gyroBiasRunning.bias.z);
             
-            soundSetEffect(SND_CALIB);
-            ledseqRun(&seq_calibrated);
+            gyroBiasFound = true;  // Set this flag to true when bias is found
         }
     }
 
@@ -1026,6 +1051,42 @@ static bool processGyroBias(int16_t gx, int16_t gy, int16_t gz, Axis3f *gyroBias
     gyroBiasOut->z = gyroBiasRunning.bias.z;
 
     return gyroBiasRunning.isBiasValueFound;
+}
+
+static bool sensorsFindBiasValue(BiasObj *bias)
+{
+    static int32_t varianceSampleTime;
+    bool foundBias = false;
+
+    if (bias->isBufferFilled) {
+        sensorsCalculateVarianceAndMean(bias, &bias->variance, &bias->mean);
+
+        DEBUG_PRINTI("Gyro variance: x=%f, y=%f, z=%f", 
+            (double)bias->variance.x,
+            (double)bias->variance.y,
+            (double)bias->variance.z);
+
+        // Check if gyro readings are stable enough
+        if (bias->variance.x < GYRO_VARIANCE_THRESHOLD_X &&
+            bias->variance.y < GYRO_VARIANCE_THRESHOLD_Y &&
+            bias->variance.z < GYRO_VARIANCE_THRESHOLD_Z &&
+            (varianceSampleTime + GYRO_MIN_BIAS_TIMEOUT_MS < xTaskGetTickCount())) {
+            
+            varianceSampleTime = xTaskGetTickCount();
+            bias->bias.x = bias->mean.x;
+            bias->bias.y = bias->mean.y;
+            bias->bias.z = bias->mean.z;
+            foundBias = true;
+            bias->isBiasValueFound = true;
+            
+            DEBUG_PRINTI("Bias values set: x=%f, y=%f, z=%f", 
+                (double)bias->bias.x,
+                (double)bias->bias.y,
+                (double)bias->bias.z);
+        }
+    }
+
+    return foundBias;
 }
 
 // #else
@@ -1139,35 +1200,35 @@ static void sensorsAddBiasValue(BiasObj *bias, int16_t x, int16_t y, int16_t z)
  * @param bias  The bias object
  */
 // Keep only one version of this function
-static bool sensorsFindBiasValue(BiasObj *bias)
-{
-    static int32_t varianceSampleTime;
-    bool foundBias = false;
+// static bool sensorsFindBiasValue(BiasObj *bias)
+// {
+//     static int32_t varianceSampleTime;
+//     bool foundBias = false;
 
-    if (bias->isBufferFilled) {
-        sensorsCalculateVarianceAndMean(bias, &bias->variance, &bias->mean);
+//     if (bias->isBufferFilled) {
+//         sensorsCalculateVarianceAndMean(bias, &bias->variance, &bias->mean);
 
-        DEBUG_PRINTI("Variance: x=%f, y=%f, z=%f", 
-            (double)bias->variance.x,
-            (double)bias->variance.y,
-            (double)bias->variance.z);
+//         DEBUG_PRINTI("Variance: x=%f, y=%f, z=%f", 
+//             (double)bias->variance.x,
+//             (double)bias->variance.y,
+//             (double)bias->variance.z);
 
-        if (bias->variance.x < GYRO_VARIANCE_THRESHOLD_X &&
-            bias->variance.y < GYRO_VARIANCE_THRESHOLD_Y &&
-            bias->variance.z < GYRO_VARIANCE_THRESHOLD_Z &&
-            (varianceSampleTime + GYRO_MIN_BIAS_TIMEOUT_MS < xTaskGetTickCount())) {
-            varianceSampleTime = xTaskGetTickCount();
-            bias->bias.x = bias->mean.x;
-            bias->bias.y = bias->mean.y;
-            bias->bias.z = bias->mean.z;
-            foundBias = true;
-            bias->isBiasValueFound = true;
-            DEBUG_PRINTI("Bias found!");
-        }
-    }
+//         if (bias->variance.x < GYRO_VARIANCE_THRESHOLD_X &&
+//             bias->variance.y < GYRO_VARIANCE_THRESHOLD_Y &&
+//             bias->variance.z < GYRO_VARIANCE_THRESHOLD_Z &&
+//             (varianceSampleTime + GYRO_MIN_BIAS_TIMEOUT_MS < xTaskGetTickCount())) {
+//             varianceSampleTime = xTaskGetTickCount();
+//             bias->bias.x = bias->mean.x;
+//             bias->bias.y = bias->mean.y;
+//             bias->bias.z = bias->mean.z;
+//             foundBias = true;
+//             bias->isBiasValueFound = true;
+//             DEBUG_PRINTI("Bias found!");
+//         }
+//     }
 
-    return foundBias;
-}
+//     return foundBias;
+// }
 
 bool sensorsMpu6050Hmc5883lMs5611ManufacturingTest(void)
 {
